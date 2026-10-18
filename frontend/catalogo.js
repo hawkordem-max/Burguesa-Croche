@@ -264,6 +264,8 @@
     return {
       ...product,
 
+      views: product.views || 0,
+
       colors: Array.isArray(product.colors)
         ? product.colors
         : [],
@@ -297,6 +299,13 @@
     if (!/^\d{12,13}$/.test(phone)) {
       notify("O WhatsApp da loja ainda não foi configurado.");
       return;
+    }
+
+    // --- INTEGRAÇÃO GOOGLE ANALYTICS (GA4) ---
+    if (typeof gtag !== "undefined") {
+      gtag("event", "clique_whatsapp", {
+        "nome_peca": state.currentProduct ? state.currentProduct.name : "Contato Geral"
+      });
     }
 
     const text =
@@ -1004,6 +1013,21 @@
 
     if (!product) return;
 
+    // --- INCREMENTA VISUALIZAÇÕES PARA O TOP 5 DO ADMIN ---
+    product.views = (product.views || 0) + 1;
+    if (typeof ProdutosService !== "undefined" && ProdutosService.salvarProduto) {
+      ProdutosService.salvarProduto(product).catch(() => {});
+    }
+
+    // --- DISPARA EVENTO NO GOOGLE ANALYTICS (GA4) ---
+    if (typeof gtag !== "undefined") {
+      gtag("event", "ver_produto", {
+        "nome_peca": product.name,
+        "categoria": product.category,
+        "preco": product.price || 0
+      });
+    }
+
     state.previousFocus = document.activeElement;
     state.currentProduct = product;
     state.selectedColor = "";
@@ -1560,9 +1584,6 @@
 
   /* ========================================
      CONSULTA DE ENVIO
-
-     Não realiza cotação automática.
-     Apenas prepara a mensagem de atendimento.
   ======================================== */
 
   function resetShipping() {
@@ -1595,6 +1616,7 @@
         "Digite um CEP com 8 números.";
 
       return;
+
     }
 
     if (!requiredOptionsSelected()) return;

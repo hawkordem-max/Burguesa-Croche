@@ -864,15 +864,108 @@ if (!Number.isFinite(price) || price < 0) {
     return "Disponibilidade a confirmar";
   }
 
-  function updateStats() {
-    const published = state.products.filter(product =>
-      product.published !== false
-    ).length;
+   /* ========================================
+     ESTATÍSTICAS / DASHBOARD
+  ======================================== */
 
-    $("#totalProducts").textContent = state.products.length;
-    $("#publishedProducts").textContent = published;
-    $("#hiddenProducts").textContent =
-      state.products.length - published;
+  let chartCatInstance = null;
+  let chartStatusInstance = null;
+
+  function updateStats() {
+    const produtos = state.products;
+
+    // 1. Atualizar Número Total
+    const dashTotal = $("#dashTotal");
+    if (dashTotal) dashTotal.textContent = produtos.length;
+
+    // 2. Contagens
+    let countsCategorias = {};
+    let countsStatus = { ready: 0, order: 0, consult: 0 };
+    let alertas = [];
+
+    produtos.forEach(p => {
+      const cat = p.category || 'Sem Categoria';
+      countsCategorias[cat] = (countsCategorias[cat] || 0) + 1;
+
+      const status = p.availability || 'consult';
+      countsStatus[status] = (countsStatus[status] || 0) + 1;
+
+      let faltando = [];
+      if (!p.price) faltando.push("Preço");
+      if (!p.photos || p.photos.length === 0) faltando.push("Foto");
+      if (!p.sizes || p.sizes.length === 0) faltando.push("Tamanho");
+      if (!p.colors || p.colors.length === 0) faltando.push("Cor");
+
+      if (faltando.length > 0) {
+        alertas.push(`<strong>${p.name || 'S/ Nome'}</strong>: faltam ${faltando.join(", ")}`);
+      }
+    });
+
+    // 3. Renderizar Alertas
+    const dashAlertCount = $("#dashAlertCount");
+    if (dashAlertCount) dashAlertCount.textContent = alertas.length;
+
+    const dashAlertList = $("#dashAlertList");
+    if (dashAlertList) {
+      if (alertas.length === 0) {
+        dashAlertList.innerHTML = '<li class="ok">✅ Todas as peças estão completas!</li>';
+      } else {
+        dashAlertList.innerHTML = alertas.map(a => `<li>${a}</li>`).join('');
+      }
+    }
+
+    // 4. Top 5 Peças
+    const dashTop5List = $("#dashTop5List");
+    if (dashTop5List) {
+      let top5 = [...produtos].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
+      dashTop5List.innerHTML = top5.map((p, index) =>
+        `<li>
+           <span class="top5-rank">#${index+1}</span>
+           <span class="top5-name">${escapeHTML(p.name)}</span>
+           <span class="top5-views">👁️ ${p.views || 0}</span>
+         </li>`
+      ).join('');
+    }
+
+    // 5. Gráficos Chart.js
+    if (typeof Chart !== 'undefined') {
+      const canvasCat = document.getElementById('chartCategorias');
+      if (canvasCat) {
+        if (chartCatInstance) chartCatInstance.destroy();
+        chartCatInstance = new Chart(canvasCat.getContext('2d'), {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(countsCategorias),
+            datasets: [{
+              data: Object.values(countsCategorias),
+              backgroundColor: ['#f9db5c', '#f4a261', '#e76f51', '#2a9d8f', '#e9c46a', '#d4a373']
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+        });
+      }
+
+      const canvasStatus = document.getElementById('chartStatus');
+      if (canvasStatus) {
+        if (chartStatusInstance) chartStatusInstance.destroy();
+        chartStatusInstance = new Chart(canvasStatus.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: ['Pronta Entrega', 'Encomenda', 'Sob Consulta'],
+            datasets: [{
+              label: 'Qtd de Peças',
+              data: [countsStatus.ready, countsStatus.order, countsStatus.consult],
+              backgroundColor: ['#2a9d8f', '#f4a261', '#cccccc']
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+          }
+        });
+      }
+    }
   }
 
   function productListItem(product) {
