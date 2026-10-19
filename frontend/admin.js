@@ -872,7 +872,9 @@ if (!Number.isFinite(price) || price < 0) {
   let chartStatusInstance = null;
 
   function updateStats() {
-    const produtos = state.products;
+    const produtos = window.DashboardFiltros
+      ? DashboardFiltros.filtrar(state.products)
+      : state.products;
 
     // 1. Atualizar Número Total
     const dashTotal = $("#dashTotal");
@@ -897,7 +899,7 @@ if (!Number.isFinite(price) || price < 0) {
       if (!p.colors || p.colors.length === 0) faltando.push("Cor");
 
       if (faltando.length > 0) {
-        alertas.push(`<strong>${p.name || 'S/ Nome'}</strong>: faltam ${faltando.join(", ")}`);
+        alertas.push(`<strong>${escapeHTML(p.name || 'S/ Nome')}</strong>: faltam ${faltando.join(", ")}`);
       }
     });
 
@@ -907,7 +909,9 @@ if (!Number.isFinite(price) || price < 0) {
 
     const dashAlertList = $("#dashAlertList");
     if (dashAlertList) {
-      if (alertas.length === 0) {
+      if (produtos.length === 0) {
+        dashAlertList.innerHTML = '<li class="small">Nenhuma peça para analisar.</li>';
+      } else if (alertas.length === 0) {
         dashAlertList.innerHTML = '<li class="ok">✅ Todas as peças estão completas!</li>';
       } else {
         dashAlertList.innerHTML = alertas.map(a => `<li>${a}</li>`).join('');
@@ -918,13 +922,13 @@ if (!Number.isFinite(price) || price < 0) {
     const dashTop5List = $("#dashTop5List");
     if (dashTop5List) {
       let top5 = [...produtos].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
-      dashTop5List.innerHTML = top5.map((p, index) =>
+      dashTop5List.innerHTML = top5.length ? top5.map((p, index) =>
         `<li>
            <span class="top5-rank">#${index+1}</span>
            <span class="top5-name">${escapeHTML(p.name)}</span>
            <span class="top5-views">👁️ ${p.views || 0}</span>
          </li>`
-      ).join('');
+      ).join('') : '<li class="small">Nenhuma peça para exibir.</li>';
     }
 
     // 5. Gráficos Chart.js
@@ -1294,6 +1298,8 @@ if (!Number.isFinite(price) || price < 0) {
     setupCategories();
     bindEvents();
     resetEditor();
+
+    window.DashboardFiltros?.iniciar({ onChange: () => updateStats() });
 
     await refreshProducts();
   }
